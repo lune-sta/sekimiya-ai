@@ -1,0 +1,4 @@
+openai
+discord.py
+boto3
+pytz
