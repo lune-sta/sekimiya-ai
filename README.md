@@ -1,14 +1,23 @@
-# Welcome to your CDK TypeScript project
+# Sekimiya AI
 
-This is a blank project for CDK development with TypeScript.
+関宮エーアイ研究室で使われている Bot のソースコードです。
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+## Requirements
+- Node.js (LTS)
+- Docker
+- AWS CLI
 
-## Useful commands
+## デプロイ手順
 
-* `npm run build`   compile typescript to js
-* `npm run watch`   watch for changes and compile
-* `npm run test`    perform the jest unit tests
-* `cdk deploy`      deploy this stack to your default AWS account/region
-* `cdk diff`        compare deployed stack with current state
-* `cdk synth`       emits the synthesized CloudFormation template
+```
+$ export AWS_DEFAULT_REGION=us-west-2
+$ aws ssm put-parameter --type 'SecureString' --name '/sekimiya-ai/discord-token' \                                        
+  --region us-west-2 --value '<Discord の Token>'
+$ aws ssm put-parameter --type 'SecureString' --name '/sekimiya-ai/openai-secret' \
+  --region us-west-2 --value '<OpenAI API の Secret>'
+$ aws ssm put-parameter --type 'String' --name '/sekimiya-ai/fx-channel-id' \
+  --region us-west-2 --value '<Discord の FX Channel の ID>'
+$ npm install
+$ cdk bootstrap
+$ cdk deploy
+```
