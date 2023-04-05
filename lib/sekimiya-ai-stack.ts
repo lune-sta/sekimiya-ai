@@ -17,6 +17,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 
 function calculateDirectoryHash(directory: string): string {
+  // ディレクトリのハッシュを計算 (Docker Image の Tag に使用)
   const hash = crypto.createHash('sha1')
   const files = fs.readdirSync(directory)
 
@@ -35,6 +36,7 @@ export class SekimiyaAiStack extends cdk.Stack {
 
     const { accountId, region } = new cdk.ScopedAws(this)
 
+    // 秘密のパラメータを Get できるポリシー
     const allowGetSecureStringPolicy = new iam.ManagedPolicy(
       this,
       'AllowGetSecureString',
@@ -52,6 +54,7 @@ export class SekimiyaAiStack extends cdk.Stack {
       }
     )
 
+    // Frugally VPC
     const vpc = new ec2.Vpc(this, 'Vpc', {
       maxAzs: 1,
       natGateways: 1,
@@ -63,6 +66,7 @@ export class SekimiyaAiStack extends cdk.Stack {
       }),
     })
 
+    // NAT Instance に Session Manager を使えるようにする
     const natInstance = vpc.node
       .findChild('PublicSubnet1')
       .node.findChild('NatInstance') as ec2.Instance
@@ -76,6 +80,12 @@ export class SekimiyaAiStack extends cdk.Stack {
 
     const repo = new ecr.Repository(this, 'Repository', {
       repositoryName: 'sekimiya-ai/chatbot',
+      autoDeleteImages: true,
+    })
+
+    repo.addLifecycleRule({
+      maxImageCount: 3,
+      tagStatus: ecr.TagStatus.ANY,
     })
 
     const tag = calculateDirectoryHash('./src/chatbot/')
@@ -107,6 +117,7 @@ export class SekimiyaAiStack extends cdk.Stack {
       },
     })
 
+    // 環境変数 LOG_GROUP_NAME をセット
     const chatBotContainer = taskDefinition.node.findChild(
       'ChatBotContainer'
     ) as ecs.ContainerDefinition
@@ -114,8 +125,17 @@ export class SekimiyaAiStack extends cdk.Stack {
       .defaultChild as logs.CfnLogGroup
     chatBotContainer.addEnvironment('LOG_GROUP_NAME', logGroup.ref)
 
-    taskDefinition.taskRole.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName('CloudWatchLogsReadOnlyAccess')
+    // コンテナ内から Log を読めるようにする
+    taskDefinition.taskRole.attachInlinePolicy(
+      new iam.Policy(this, 'LogReadPolicy', {
+        statements: [
+          new iam.PolicyStatement({
+            actions: ['logs:DescribeLogStreams', 'logs:GetLogEvents'],
+            resources: [logGroup.attrArn],
+            effect: iam.Effect.ALLOW,
+          }),
+        ],
+      })
     )
     taskDefinition.taskRole.addManagedPolicy(allowGetSecureStringPolicy)
 
@@ -124,6 +144,7 @@ export class SekimiyaAiStack extends cdk.Stack {
       taskDefinition,
     })
 
+    // Discord の FX Channel ID
     const channelId = ssm.StringParameter.valueFromLookup(
       this,
       '/sekimiya-ai/fx-channel-id'
@@ -140,12 +161,14 @@ export class SekimiyaAiStack extends cdk.Stack {
         memorySize: 1024,
         environment: {
           CHANNEL_ID: channelId,
+          IMPORTANCE_LEVEL: '3', // 星3の重要指標だけお知らせ
         },
       }
     )
 
     postIndicatorsFunction.role?.addManagedPolicy(allowGetSecureStringPolicy)
 
+    // 平日朝8時に起動
     const rule = new events.Rule(this, 'Rule', {
       schedule: events.Schedule.cron({
         hour: '23',

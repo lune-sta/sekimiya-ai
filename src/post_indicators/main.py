@@ -17,6 +17,7 @@ ssm_response = ssm_client.get_parameters(
 
 DISCORD_TOKEN = ssm_response["Parameters"][0]["Value"]
 TARGET_CHANNEL_ID = os.environ["CHANNEL_ID"]
+IMPORTANCE_LEVEL = int(os.environ["IMPORTANCE_LEVEL"])
 
 API_ENDPOINT = f"https://discord.com/api/v10/channels/{TARGET_CHANNEL_ID}/messages"
 
@@ -55,7 +56,7 @@ def get_indicators():
                 indicator = data[2].get_text()
                 importance = data[3].get_text()
 
-            if "" not in time_ or importance.count("★") < 2:
+            if "" not in time_ or importance.count("★") < IMPORTANCE_LEVEL:
                 continue
 
             indicators.append(
