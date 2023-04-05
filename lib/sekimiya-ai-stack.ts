@@ -80,7 +80,6 @@ export class SekimiyaAiStack extends cdk.Stack {
 
     const repo = new ecr.Repository(this, 'Repository', {
       repositoryName: 'sekimiya-ai/chatbot',
-      autoDeleteImages: true,
     })
 
     repo.addLifecycleRule({
@@ -142,6 +141,18 @@ export class SekimiyaAiStack extends cdk.Stack {
     new ecs.FargateService(this, 'Service', {
       cluster,
       taskDefinition,
+      capacityProviderStrategies: [
+        {
+          capacityProvider: 'FARGATE',
+          base: 0,
+          weight: 0,
+        },
+        {
+          capacityProvider: 'FARGATE_SPOT',
+          base: 1,
+          weight: 1,
+        },
+      ],
     })
 
     // Discord の FX Channel ID
