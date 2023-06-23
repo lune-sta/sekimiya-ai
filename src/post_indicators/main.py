@@ -87,7 +87,7 @@ def generate_message(indicators: list):
         day = indicator["day"]
         time = indicator["time"]
         day_str = f"{current_year}/{day.split('(')[0]}"
-        dt = datetime.strptime(day_str, "%Y/%m/%.prettierrc")
+        dt = datetime.strptime(day_str, "%Y/%m/%d")
         dt_jst = jst.localize(dt)
 
         if today <= dt_jst < day_after_tomorrow:
