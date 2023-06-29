@@ -2,3 +2,12 @@ openai
 discord.py
 boto3
 pytz
+geopy
+google-api-python-client
+beautifulsoup4
+sumy
+tinysegmenter
+spacy
+ginza
+ja-ginza
+tiktoken
