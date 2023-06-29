@@ -11,23 +11,32 @@ import * as lambdaPython from '@aws-cdk/aws-lambda-python-alpha'
 import * as events from 'aws-cdk-lib/aws-events'
 import * as targets from 'aws-cdk-lib/aws-events-targets'
 import * as imagedeploy from 'cdk-docker-image-deployment'
+import * as location from 'aws-cdk-lib/aws-location';
 import { readFileSync } from 'fs'
 import * as crypto from 'crypto'
 import * as fs from 'fs'
 import * as path from 'path'
 
 function calculateDirectoryHash(directory: string): string {
-  // ディレクトリのハッシュを計算 (Docker Image の Tag に使用)
-  const hash = crypto.createHash('sha1')
-  const files = fs.readdirSync(directory)
+  const hash = crypto.createHash('sha1');
+  const files = fs.readdirSync(directory);
 
   files.forEach((file) => {
-    const filePath = path.join(directory, file)
-    const fileContent = fs.readFileSync(filePath)
-    hash.update(fileContent)
-  })
+    const filePath = path.join(directory, file);
+    const stat = fs.statSync(filePath);
 
-  return hash.digest('hex')
+    if (stat.isDirectory()) {
+      // If it is a directory, recurse.
+      const dirHash = calculateDirectoryHash(filePath);
+      hash.update(dirHash);
+    } else {
+      // If it is a file, read it and update the hash.
+      const fileContent = fs.readFileSync(filePath);
+      hash.update(fileContent);
+    }
+  });
+
+  return hash.digest('hex');
 }
 
 export class SekimiyaAiStack extends cdk.Stack {
@@ -46,33 +55,34 @@ export class SekimiyaAiStack extends cdk.Stack {
             effect: iam.Effect.ALLOW,
             actions: ['ssm:GetParameters'],
             resources: [
-              `arn:aws:ssm:${region}:${accountId}:parameter/sekimiya-ai/discord-token`,
-              `arn:aws:ssm:${region}:${accountId}:parameter/sekimiya-ai/openai-secret`,
+              `arn:aws:ssm:${region}:${accountId}:parameter/sekimiya-ai/*`,
             ],
           }),
         ],
       }
     )
 
+    const allowLocationServicePolicy = new iam.ManagedPolicy(
+        this,
+        'AllowLocationServicePolicy',
+        {
+          statements: [
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: ['geo:SearchPlaceIndexForText'],
+              resources: [
+                `arn:aws:geo:${region}:${accountId}:place-index/sekimiya-ai-index`
+              ],
+            }),
+          ],
+        }
+    )
+
     // Frugally VPC
     const vpc = new ec2.Vpc(this, 'Vpc', {
       maxAzs: 1,
-      natGateways: 1,
-      natGatewayProvider: ec2.NatProvider.instance({
-        instanceType: ec2.InstanceType.of(
-          ec2.InstanceClass.T3,
-          ec2.InstanceSize.NANO
-        ),
-      }),
+      natGateways: 1
     })
-
-    // NAT Instance に Session Manager を使えるようにする
-    const natInstance = vpc.node
-      .findChild('PublicSubnet1')
-      .node.findChild('NatInstance') as ec2.Instance
-    natInstance.role.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore')
-    )
 
     const cluster = new ecs.Cluster(this, 'Cluster', {
       vpc,
@@ -137,6 +147,7 @@ export class SekimiyaAiStack extends cdk.Stack {
       })
     )
     taskDefinition.taskRole.addManagedPolicy(allowGetSecureStringPolicy)
+    taskDefinition.taskRole.addManagedPolicy(allowLocationServicePolicy)
 
     new ecs.FargateService(this, 'Service', {
       cluster,
@@ -169,7 +180,7 @@ export class SekimiyaAiStack extends cdk.Stack {
         runtime: lambda.Runtime.PYTHON_3_8,
         index: 'main.py',
         handler: 'handler',
-        memorySize: 1024,
+        memorySize: 2048,
         environment: {
           CHANNEL_ID: channelId,
           IMPORTANCE_LEVEL: '3', // 星3の重要指標だけお知らせ
@@ -189,5 +200,10 @@ export class SekimiyaAiStack extends cdk.Stack {
     })
 
     rule.addTarget(new targets.LambdaFunction(postIndicatorsFunction))
+
+    new location.CfnPlaceIndex(this, 'PlaceIndex', {
+      indexName: 'sekimiya-ai-index',
+      dataSource: 'Esri',
+    });
   }
 }

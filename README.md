@@ -17,6 +17,12 @@ $ aws ssm put-parameter --type 'SecureString' --name '/sekimiya-ai/openai-secret
   --region us-west-2 --value '<OpenAI API の Secret>'
 $ aws ssm put-parameter --type 'String' --name '/sekimiya-ai/fx-channel-id' \
   --region us-west-2 --value '<Discord の FX Channel の ID>'
+$ aws ssm put-parameter --type 'String' --name '/sekimiya-ai/recruit-api-key' \
+  --region us-west-2 --value '<グルメサーチ API の API Key>'
+$ aws ssm put-parameter --type 'String' --name '/sekimiya-ai/gcp-api-key' \
+  --region us-west-2 --value '<GCP API Key>'
+$ aws ssm put-parameter --type 'String' --name '/sekimiya-ai/google-cse-id' \
+  --region us-west-2 --value '<Google CSE ID>'
 $ npm install
 $ cdk bootstrap
 $ cdk deploy

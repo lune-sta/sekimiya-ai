@@ -3,10 +3,9 @@ import re
 from datetime import datetime, timedelta
 
 import boto3
-from bs4 import BeautifulSoup
-import requests
 import pytz
-
+import requests
+from bs4 import BeautifulSoup
 
 ssm_client = boto3.client("ssm")
 ssm_response = ssm_client.get_parameters(
